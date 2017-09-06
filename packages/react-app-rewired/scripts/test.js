@@ -24,8 +24,8 @@ if (!process.env.CI && argv.indexOf("--coverage") < 0) {
   argv.push("--watch");
 }
 
-
-const createJestConfig = require("./utils/createJestConfig");
+const createJestConfig = require(paths.scriptVersion + "/utils/createJestConfig");
+const rewireJestConfig = require("./utils/rewireJestConfig");
 const override = require(paths.configOverrides);
 const overrideFn = (typeof override === 'function' || typeof override.jest !== 'function')
   ? (config) => config
@@ -33,15 +33,23 @@ const overrideFn = (typeof override === 'function' || typeof override.jest !== '
 
 const path = require("path");
 
+// hide overrides in package.json for CRA's original createJestConfig
+const packageJson = require(paths.appPackageJson);
+const jestOverrides = packageJson.jest;
+delete packageJson.jest;
+
+const config = createJestConfig(
+  relativePath => path.resolve(__dirname, "..", relativePath),
+  path.resolve(paths.appSrc, ".."),
+  false
+);
+
+// restore overrides
+packageJson.jest = jestOverrides;
+
 argv.push(
   "--config",
-  JSON.stringify(
-    overrideFn(createJestConfig(
-      relativePath => path.resolve(__dirname, "..", relativePath),
-      path.resolve(paths.appSrc, ".."),
-      false
-    ))
-  )
+  JSON.stringify(overrideFn(rewireJestConfig(config)))
 );
 
 jest.run(argv);
